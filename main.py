@@ -60,7 +60,7 @@ def run(
 
     pid = os.getpid()
     list_of_dataloaders = methods["get_dataloaders"](seed)
-
+    print('list_of_dataloaders: ', list_of_dataloaders)
     device = utils.set_torch_device(gpu)
 
     result_collect = []
@@ -79,7 +79,7 @@ def run(
 
         imagesize = dataloaders["training"].dataset.imagesize
         simplenet_list = methods["get_simplenet"](imagesize, device)
-
+        print('test:', test)
         models_dir = os.path.join(run_save_path, "models")
         os.makedirs(models_dir, exist_ok=True)
         for i, SimpleNet in enumerate(simplenet_list):
@@ -93,24 +93,25 @@ def run(
 
             SimpleNet.set_model_dir(os.path.join(models_dir, f"{i}"), dataset_name)
             if not test:
-                i_auroc, p_auroc, pro_auroc = SimpleNet.train(dataloaders["training"], dataloaders["testing"])
+                i_auroc = SimpleNet.train(dataloaders["training"], dataloaders["testing"])
             else:
                 # BUG: the following line is not using. Set test with True by default.
-                # i_auroc, p_auroc, pro_auroc =  SimpleNet.test(dataloaders["training"], dataloaders["testing"], save_segmentation_images)
+                i_auroc =  SimpleNet.test(dataloaders["training"], dataloaders["testing"], save_segmentation_images)
                 print("Warning: Pls set test with true by default")
 
             result_collect.append(
                 {
                     "dataset_name": dataset_name,
                     "instance_auroc": i_auroc, # auroc,
-                    "full_pixel_auroc": p_auroc, # full_pixel_auroc,
-                    "anomaly_pixel_auroc": pro_auroc,
                 }
             )
 
             for key, item in result_collect[-1].items():
                 if key != "dataset_name":
-                    LOGGER.info("{0}: {1:3.3f}".format(key, item))
+                    if isinstance(item, (int, float)):
+                        LOGGER.info("{0}: {1:3.3f}".format(key, item))
+                    else:
+                        LOGGER.info("{0}: {1}".format(key, item))
 
         LOGGER.info("\n\n-----\n")
 

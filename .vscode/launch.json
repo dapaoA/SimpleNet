@@ -1,0 +1,18 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Run SimpleNet",
+            "type": "python",
+            "request": "launch",
+            "justMyCode": false,
+            "program": "C:/Users/hokop/Documents/GitHub/SimpleNet/run.py",
+            "console": "integratedTerminal",
+            "cwd": "C:/Users/hokop/Documents/GitHub/SimpleNet",
+            "python": "C:/Users/hokop/anaconda3/envs/ddadan/python.exe",
+            "env": {
+                "PYTHONUNBUFFERED": "1"
+            }
+        }
+    ]
+}

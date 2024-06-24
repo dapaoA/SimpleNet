@@ -333,15 +333,10 @@ class SimpleNet(torch.nn.Module):
             scores, anomaly_labels
         )["auroc"]
 
-        # Compute PRO score & PW Auroc for all images
-        pixel_scores = metrics.compute_pixelwise_retrieval_metrics(
-            segmentations, masks_gt
-        )
-        full_pixel_auroc = pixel_scores["auroc"]
 
-        return auroc, full_pixel_auroc
+        return auroc
     
-    def _evaluate(self, test_data, scores, segmentations, features, labels_gt, masks_gt):
+    def _evaluate(self, test_data, scores, features, labels_gt):
         
         scores = np.squeeze(np.array(scores))
         img_min_scores = scores.min(axis=-1)
@@ -353,37 +348,7 @@ class SimpleNet(torch.nn.Module):
             scores, labels_gt 
         )["auroc"]
 
-        if len(masks_gt) > 0:
-            segmentations = np.array(segmentations)
-            min_scores = (
-                segmentations.reshape(len(segmentations), -1)
-                .min(axis=-1)
-                .reshape(-1, 1, 1, 1)
-            )
-            max_scores = (
-                segmentations.reshape(len(segmentations), -1)
-                .max(axis=-1)
-                .reshape(-1, 1, 1, 1)
-            )
-            norm_segmentations = np.zeros_like(segmentations)
-            for min_score, max_score in zip(min_scores, max_scores):
-                norm_segmentations += (segmentations - min_score) / max(max_score - min_score, 1e-2)
-            norm_segmentations = norm_segmentations / len(scores)
-
-
-            # Compute PRO score & PW Auroc for all images
-            pixel_scores = metrics.compute_pixelwise_retrieval_metrics(
-                norm_segmentations, masks_gt)
-                # segmentations, masks_gt
-            full_pixel_auroc = pixel_scores["auroc"]
-
-            pro = metrics.compute_pro(np.squeeze(np.array(masks_gt)), 
-                                            norm_segmentations)
-        else:
-            full_pixel_auroc = -1 
-            pro = -1
-
-        return auroc, full_pixel_auroc, pro
+        return auroc
         
     
     def train(self, training_data, test_data):
@@ -401,10 +366,10 @@ class SimpleNet(torch.nn.Module):
                 self.load_state_dict(state_dict, strict=False)
 
             self.predict(training_data, "train_")
-            scores, segmentations, features, labels_gt, masks_gt = self.predict(test_data)
-            auroc, full_pixel_auroc, anomaly_pixel_auroc = self._evaluate(test_data, scores, segmentations, features, labels_gt, masks_gt)
+            scores, features, labels_gt = self.predict(test_data)
+            auroc= self._evaluate(test_data, scores, features, labels_gt)
             
-            return auroc, full_pixel_auroc, anomaly_pixel_auroc
+            return auroc
         
         def update_state_dict(d):
             
@@ -422,30 +387,20 @@ class SimpleNet(torch.nn.Module):
             self._train_discriminator(training_data)
 
             # torch.cuda.empty_cache()
-            scores, segmentations, features, labels_gt, masks_gt = self.predict(test_data)
-            auroc, full_pixel_auroc, pro = self._evaluate(test_data, scores, segmentations, features, labels_gt, masks_gt)
+            scores, features, labels_gt = self.predict(test_data)
+            auroc = self._evaluate(test_data, scores, features, labels_gt)
             self.logger.logger.add_scalar("i-auroc", auroc, i_mepoch)
-            self.logger.logger.add_scalar("p-auroc", full_pixel_auroc, i_mepoch)
-            self.logger.logger.add_scalar("pro", pro, i_mepoch)
 
             if best_record is None:
-                best_record = [auroc, full_pixel_auroc, pro]
+                best_record = [auroc]
                 update_state_dict(state_dict)
                 # state_dict = OrderedDict({k:v.detach().cpu() for k, v in self.state_dict().items()})
             else:
                 if auroc > best_record[0]:
-                    best_record = [auroc, full_pixel_auroc, pro]
+                    best_record = [auroc]
                     update_state_dict(state_dict)
-                    # state_dict = OrderedDict({k:v.detach().cpu() for k, v in self.state_dict().items()})
-                elif auroc == best_record[0] and full_pixel_auroc > best_record[1]:
-                    best_record[1] = full_pixel_auroc
-                    best_record[2] = pro 
-                    update_state_dict(state_dict)
-                    # state_dict = OrderedDict({k:v.detach().cpu() for k, v in self.state_dict().items()})
 
-            print(f"----- {i_mepoch} I-AUROC:{round(auroc, 4)}(MAX:{round(best_record[0], 4)})"
-                  f"  P-AUROC{round(full_pixel_auroc, 4)}(MAX:{round(best_record[1], 4)}) -----"
-                  f"  PRO-AUROC{round(pro, 4)}(MAX:{round(best_record[2], 4)}) -----")
+            print(f"----- {i_mepoch} I-AUROC:{round(auroc, 4)}(MAX:{round(best_record[0], 4)})")
         
         torch.save(state_dict, ckpt_path)
         
@@ -552,26 +507,21 @@ class SimpleNet(torch.nn.Module):
 
         img_paths = []
         scores = []
-        masks = []
         features = []
         labels_gt = []
-        masks_gt = []
         from sklearn.manifold import TSNE
 
         with tqdm.tqdm(dataloader, desc="Inferring...", leave=False) as data_iterator:
             for data in data_iterator:
                 if isinstance(data, dict):
                     labels_gt.extend(data["is_anomaly"].numpy().tolist())
-                    if data.get("mask", None) is not None:
-                        masks_gt.extend(data["mask"].numpy().tolist())
                     image = data["image"]
                     img_paths.extend(data['image_path'])
-                _scores, _masks, _feats = self._predict(image)
-                for score, mask, feat, is_anomaly in zip(_scores, _masks, _feats, data["is_anomaly"].numpy().tolist()):
+                _scores,  _feats = self._predict(image)
+                for score, feat, is_anomaly in zip(_scores, _feats, data["is_anomaly"].numpy().tolist()):
                     scores.append(score)
-                    masks.append(mask)
 
-        return scores, masks, features, labels_gt, masks_gt
+        return scores, features, labels_gt
 
     def _predict(self, images):
         """Infer score and mask for a batch of images."""
@@ -609,7 +559,7 @@ class SimpleNet(torch.nn.Module):
             features = features.reshape(batchsize, scales[0], scales[1], -1)
             masks, features = self.anomaly_segmentor.convert_to_segmentation(patch_scores, features)
 
-        return list(image_scores), list(masks), list(features)
+        return list(image_scores), list(features)
 
     @staticmethod
     def _params_file(filepath, prepend=""):
