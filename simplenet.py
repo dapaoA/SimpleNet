@@ -123,7 +123,6 @@ class SimpleNet(torch.nn.Module):
         dsc_hidden=None, # 1024
         dsc_margin=.8, # .5
         dsc_lr=0.0002,
-        train_backbone=False,
         auto_noise=0,
         cos_lr=False,
         lr=1e-3,
@@ -145,7 +144,7 @@ class SimpleNet(torch.nn.Module):
         self.forward_modules = torch.nn.ModuleDict({})
 
         feature_aggregator = common.NetworkFeatureAggregator(
-            self.backbone, self.layers_to_extract_from, self.device, train_backbone
+            self.backbone, self.layers_to_extract_from, self.device
         )
         feature_dimensions = feature_aggregator.feature_dimensions(input_shape)
         self.forward_modules["feature_aggregator"] = feature_aggregator
@@ -172,9 +171,6 @@ class SimpleNet(torch.nn.Module):
         self.meta_epochs = meta_epochs
         self.lr = lr
         self.cos_lr = cos_lr
-        self.train_backbone = train_backbone
-        if self.train_backbone:
-            self.backbone_opt = torch.optim.AdamW(self.forward_modules["feature_aggregator"].backbone.parameters(), lr)
         # AED
         self.aed_meta_epochs = aed_meta_epochs
 
@@ -229,7 +225,7 @@ class SimpleNet(torch.nn.Module):
         """Returns feature embeddings for images."""
 
         B = len(images)
-        if not evaluation and self.train_backbone:
+        if not evaluation:
             self.forward_modules["feature_aggregator"].train()
             features = self.forward_modules["feature_aggregator"](images, eval=evaluation)
         else:
@@ -467,8 +463,6 @@ class SimpleNet(torch.nn.Module):
                     loss.backward()
                     if self.pre_proj > 0:
                         self.proj_opt.step()
-                    if self.train_backbone:
-                        self.backbone_opt.step()
                     self.dsc_opt.step()
 
                     loss = loss.detach().cpu() 

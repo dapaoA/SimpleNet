@@ -93,7 +93,7 @@ def run(
 
             SimpleNet.set_model_dir(os.path.join(models_dir, f"{i}"), dataset_name)
             if not test:
-                i_auroc = SimpleNet.train(dataloaders["training"], dataloaders["testing"])
+                i_auroc = SimpleNet.train(dataloaders["training"], dataloaders["validation"])
             else:
                 # BUG: the following line is not using. Set test with True by default.
                 i_auroc =  SimpleNet.test(dataloaders["training"], dataloaders["testing"], save_segmentation_images)
