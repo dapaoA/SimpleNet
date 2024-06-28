@@ -93,12 +93,11 @@ def run(
 
             SimpleNet.set_model_dir(os.path.join(models_dir, f"{i}"), dataset_name)
             if not test:
-                i_auroc = SimpleNet.train(dataloaders["training"], dataloaders["validation"])
+                i_auroc = SimpleNet.train(dataloaders["training"], dataloaders["testing"])
             else:
                 # BUG: the following line is not using. Set test with True by default.
-                i_auroc =  SimpleNet.test(dataloaders["training"], dataloaders["testing"], save_segmentation_images)
+                i_auroc =  SimpleNet.test(dataloaders["testing"], save_segmentation_images)
                 print("Warning: Pls set test with true by default")
-
             result_collect.append(
                 {
                     "dataset_name": dataset_name,
@@ -228,7 +227,7 @@ def net(
 @click.argument("name", type=str)
 @click.argument("data_path", type=click.Path(exists=True, file_okay=False))
 @click.option("--subdatasets", "-d", multiple=True, type=str, required=True)
-@click.option("--train_val_split", type=float, default=1, show_default=True)
+@click.option("--train_val_split", type=float, default=0.8, show_default=True)
 @click.option("--batch_size", default=2, type=int, show_default=True)
 @click.option("--num_workers", default=2, type=int, show_default=True)
 @click.option("--resize", default=256, type=int, show_default=True)

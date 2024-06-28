@@ -22,7 +22,7 @@ def main():
     --pretrain_embed_dimension 1536 ^
     --target_embed_dimension 1536 ^
     --patchsize 3 ^
-    --meta_epochs 4 ^
+    --meta_epochs 8 ^
     --embedding_size 256 ^
     --gan_epochs 4 ^
     --noise_std 0.015 ^

@@ -282,7 +282,7 @@ class SimpleNet(torch.nn.Module):
         return features, patch_shapes
 
     
-    def test(self, training_data, test_data, save_segmentation_images):
+    def test(self, test_data, save_segmentation_images):
 
         ckpt_path = os.path.join(self.ckpt_dir, "models.ckpt")
         if os.path.exists(ckpt_path):
